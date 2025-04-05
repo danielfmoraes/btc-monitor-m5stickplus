@@ -101,5 +101,5 @@ void setup() {
 
 void loop() {
   fetchAndDisplayBTC();
-  delay(10000); // Atualiza a cada 10 segundos para evitar erro 429
+  delay(20000); // Atualiza a cada 20 segundos para evitar erro 429
 }
