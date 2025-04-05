@@ -1,0 +1,40 @@
+# BTC Monitor com M5StickPlus (PlatformIO)
+
+Projeto para exibir o valor do Bitcoin em Dólar e Real no M5StickPlus com destaque de variação de 24h:
+
+- 🔴 Queda superior a 5% = vermelho
+- 🔵 Alta superior a 5% = azul
+- ⚪️ Estável = branco
+
+## 🛠️ Requisitos
+
+- VS Code com extensão PlatformIO
+- Placa: M5StickC Plus
+- Conexão Wi-Fi
+
+## 🚀 Como usar
+
+1. Clone este repositório
+2. Insira seu SSID e senha do Wi-Fi no `main.cpp`
+3. Compile e envie para seu M5StickPlus
+4. Acompanhe o display!
+5. O preço será atualizado a cada 3 segundos
+
+
+## 📡 Fonte de dados
+
+[CoinGecko API](https://www.coingecko.com/)
+
+## 🔐 Segurança
+
+As credenciais de Wi-Fi ficam em `include/secrets.h` e **não devem ser incluídas no repositório público**.
+
+Exemplo de `secrets.h`:
+
+```cpp
+#define WIFI_SSID "SEU_SSID"
+#define WIFI_PASSWORD "SUA_SENHA"
+
+## 📄 Licença
+
+[MIT](LICENSE)
