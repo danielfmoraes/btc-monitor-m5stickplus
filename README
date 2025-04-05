@@ -18,7 +18,7 @@ Projeto para exibir o valor do Bitcoin em Dólar e Real no M5StickPlus com desta
 2. Insira seu SSID e senha do Wi-Fi no `main.cpp`
 3. Compile e envie para seu M5StickPlus
 4. Acompanhe o display!
-5. O preço será atualizado a cada 20 segundos
+5. O preço será atualizado a cada 30 segundos
 
 
 ## 📡 Fonte de dados
