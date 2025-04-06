@@ -137,7 +137,6 @@ void fetchAndDisplayBTC() {
   
   // Variações: exibe 1h e 24h lado a lado
   StickCP2.Lcd.setTextSize(1);
-  
   // Linha de 1h
   StickCP2.Lcd.setCursor(10, 60);
   StickCP2.Lcd.setTextColor(color1hUSD);
@@ -145,7 +144,6 @@ void fetchAndDisplayBTC() {
   StickCP2.Lcd.setCursor(80, 60);
   StickCP2.Lcd.setTextColor(color1hBRL);
   StickCP2.Lcd.printf("1h BRL: %.2f%%", change1hBRL);
-  
   // Linha de 24h
   StickCP2.Lcd.setCursor(10, 75);
   StickCP2.Lcd.setTextColor(color24hUSD);
@@ -178,7 +176,7 @@ void setup() {
 void loop() {
   StickCP2.update();
   
-  // Se o botão A for pressionado, registra o preço atual (USD) como compra
+  // Se o botão A for pressionado, registra o preço atual (USD) como compra e inicia a mensagem de confirmação
   if (StickCP2.BtnA.wasPressed()) {
     purchasePrice = lastPriceUSD;
     Serial.printf("Botão A pressionado. Preço registrado: $%.2f\n", purchasePrice);
@@ -186,7 +184,7 @@ void loop() {
     showPurchaseMsg = true;
   }
   
-  // Exibe mensagem de confirmação não bloqueante por 2 segundos
+  // Exibe a mensagem de confirmação por 2 segundos e impede atualização do display nesse período
   if (showPurchaseMsg) {
     StickCP2.Lcd.fillRect(0, 145, 160, 16, BLACK);
     StickCP2.Lcd.setTextSize(1);
@@ -198,11 +196,10 @@ void loop() {
     }
   }
   
-  // Atualiza o display a cada 30 segundos (não bloqueante)
+  // Atualiza o display a cada 30 segundos, desde que não esteja exibindo a mensagem de compra
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
+  if (!showPurchaseMsg && (currentMillis - previousMillis >= interval)) {
     previousMillis = currentMillis;
     fetchAndDisplayBTC();
   }
 }
-
