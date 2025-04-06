@@ -61,14 +61,13 @@ void fetchAndDisplayBTC() {
         float brl = btcBRL["current_price"];
         http.end();
         
-        // Definição de cores para variações
-        uint16_t color1h = WHITE;
-        if (change1h_usd > 5) color1h = BLUE;
-        else if (change1h_usd < -5) color1h = RED;
+        // Define as cores para as variações:
+        // Se a variação for positiva, exibe em verde; se negativa, em vermelho.
+        uint16_t color1h = (change1h_usd >= 0 ? GREEN : RED);
+        uint16_t color24h = (change24h_usd >= 0 ? GREEN : RED);
         
-        uint16_t color24h = WHITE;
-        if (change24h_usd > 5) color24h = BLUE;
-        else if (change24h_usd < -5) color24h = RED;
+        // Define a cor do preço com base na variação de 24h
+        uint16_t priceColor = (change24h_usd >= 0 ? GREEN : RED);
         
         // Se houve compra, calcula a variação da compra
         bool showPurchase = (purchasePrice > 0);
@@ -88,9 +87,9 @@ void fetchAndDisplayBTC() {
         StickCP2.Lcd.setCursor(10, 0);
         StickCP2.Lcd.println("BTC Price");
         
-        // Preços
+        // Exibe o preço com a cor indicativa
         StickCP2.Lcd.setTextSize(2);
-        StickCP2.Lcd.setTextColor(WHITE);
+        StickCP2.Lcd.setTextColor(priceColor);
         StickCP2.Lcd.setCursor(10, 10);
         StickCP2.Lcd.printf("USD: $%.2f", usd);
         StickCP2.Lcd.setCursor(10, 35);
@@ -144,7 +143,7 @@ void fetchAndDisplayBTC() {
 }
 
 void setup() {
-  Serial.begin(115200); // Para debug, se necessário
+  Serial.begin(115200); // Para debug
   StickCP2.begin();
   StickCP2.Lcd.setRotation(1);
   StickCP2.Lcd.fillScreen(BLACK);
@@ -165,7 +164,7 @@ void loop() {
     StickCP2.Lcd.setTextColor(WHITE);
     StickCP2.Lcd.setCursor(10, 120);
     StickCP2.Lcd.printf("Comprado: $%.2f", purchasePrice);
-    delay(3000); // Pausa breve para o usuário ver a mensagem
+    delay(3000); // Pausa breve para exibir a mensagem
   }
   
   // Atualiza o display a cada 30 segundos (não bloqueante)
