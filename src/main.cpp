@@ -7,17 +7,22 @@
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
 
-// Endpoints para dados de BTC (USD e BRL) com variação de 1h e 24h
-const String urlUSD = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin&price_change_percentage=1h,24h";
-const String urlBRL = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=brl&ids=bitcoin&price_change_percentage=1h,24h";
+// Endpoints para Binance - USD
+const String tickerUSDUrl = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT";
+const String klineUSDUrl  = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=1";
+
+// Endpoints para Binance - BRL (verifique se esse par está disponível)
+const String tickerBRLUrl = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCBRL";
+const String klineBRLUrl  = "https://api.binance.com/api/v3/klines?symbol=BTCBRL&interval=1h&limit=1";
 
 // Variáveis globais para registrar a compra
-float purchasePrice = -1.0;   // Se for -1, ainda não foi registrada nenhuma compra
-float lastUsdPrice = 0.0;       // Guarda o último preço em USD obtido
+float purchasePrice = -1.0;   // Se for -1, nenhuma compra foi registrada
+float lastPriceUSD = 0.0;       // Guarda o último preço USD obtido
 
 unsigned long previousMillis = 0;
-const long interval = 30000;    // 30 segundos
+const long interval = 30000;    // Atualiza a cada 30 segundos
 
+// Função para conectar ao Wi-Fi
 void connectWiFi() {
   WiFi.begin(ssid, password);
   StickCP2.Lcd.println("Conectando WiFi...");
@@ -28,117 +33,141 @@ void connectWiFi() {
   StickCP2.Lcd.println("\nWiFi conectado!");
 }
 
-void fetchAndDisplayBTC() {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    
-    // Requisição para dados em USD
-    http.begin(urlUSD);
-    http.setTimeout(10000); // Timeout de 10 segundos
-    int httpCodeUSD = http.GET();
-    
-    if (httpCodeUSD == 200) {
-      String payloadUSD = http.getString();
-      DynamicJsonDocument docUSD(2048);
-      deserializeJson(docUSD, payloadUSD);
-      // O retorno é um array; pegamos o primeiro objeto
-      JsonObject btcUSD = docUSD[0];
-      float usd = btcUSD["current_price"];
-      float change1h_usd = btcUSD["price_change_percentage_1h_in_currency"];
-      float change24h_usd = btcUSD["price_change_percentage_24h_in_currency"];
-      lastUsdPrice = usd;  // Atualiza o último preço USD
-      http.end();
-      
-      // Requisição para dados em BRL
-      http.begin(urlBRL);
-      http.setTimeout(10000);
-      int httpCodeBRL = http.GET();
-      if (httpCodeBRL == 200) {
-        String payloadBRL = http.getString();
-        DynamicJsonDocument docBRL(2048);
-        deserializeJson(docBRL, payloadBRL);
-        JsonObject btcBRL = docBRL[0];
-        float brl = btcBRL["current_price"];
-        http.end();
-        
-        // Define as cores para as variações:
-        // Se a variação for positiva, exibe em verde; se negativa, em vermelho.
-        uint16_t color1h = (change1h_usd >= 0 ? GREEN : RED);
-        uint16_t color24h = (change24h_usd >= 0 ? GREEN : RED);
-        
-        // Define a cor do preço com base na variação de 24h
-        uint16_t priceColor = (change24h_usd >= 0 ? GREEN : RED);
-        
-        // Se houve compra, calcula a variação da compra
-        bool showPurchase = (purchasePrice > 0);
-        float purchaseVariation = 0.0;
-        uint16_t purchaseColor = WHITE;
-        if (showPurchase) {
-          purchaseVariation = ((usd - purchasePrice) / purchasePrice) * 100.0;
-          purchaseColor = (purchaseVariation >= 0 ? GREEN : RED);
-        }
-        
-        // Atualiza o display
-        StickCP2.Lcd.fillScreen(BLACK);
-        
-        // Título
-        StickCP2.Lcd.setTextSize(1);
-        StickCP2.Lcd.setTextColor(WHITE);
-        StickCP2.Lcd.setCursor(10, 0);
-        StickCP2.Lcd.println("BTC Price");
-        
-        // Exibe o preço com a cor indicativa
-        StickCP2.Lcd.setTextSize(2);
-        StickCP2.Lcd.setTextColor(priceColor);
-        StickCP2.Lcd.setCursor(10, 10);
-        StickCP2.Lcd.printf("USD: $%.2f", usd);
-        StickCP2.Lcd.setCursor(10, 35);
-        StickCP2.Lcd.printf("BRL: R$%.2f", brl);
-        
-        // Variações de 1h e 24h
-        StickCP2.Lcd.setTextSize(1);
-        StickCP2.Lcd.setCursor(10, 60);
-        StickCP2.Lcd.setTextColor(color1h);
-        StickCP2.Lcd.printf("1h: %.2f%%", change1h_usd);
-        StickCP2.Lcd.setCursor(10, 75);
-        StickCP2.Lcd.setTextColor(color24h);
-        StickCP2.Lcd.printf("24h: %.2f%%", change24h_usd);
-        
-        // Se a compra foi registrada, exibe "Comprado" e a variação da compra
-        if (showPurchase) {
-          StickCP2.Lcd.setTextSize(1);
-          StickCP2.Lcd.setTextColor(WHITE);
-          StickCP2.Lcd.setCursor(10, 90);
-          StickCP2.Lcd.printf("Comprado: $%.2f", purchasePrice);
-          StickCP2.Lcd.setCursor(10, 105);
-          StickCP2.Lcd.setTextColor(purchaseColor);
-          StickCP2.Lcd.printf("Var: %.2f%%", purchaseVariation);
-        }
-        
-      } else {
-        http.end();
-        StickCP2.Lcd.fillScreen(BLACK);
-        StickCP2.Lcd.setTextSize(1);
-        StickCP2.Lcd.setTextColor(RED);
-        StickCP2.Lcd.setCursor(10, 10);
-        StickCP2.Lcd.println("Erro na requisicao BRL.");
-        StickCP2.Lcd.printf("Codigo: %d", httpCodeBRL);
-      }
-    } else {
-      http.end();
-      StickCP2.Lcd.fillScreen(BLACK);
-      StickCP2.Lcd.setTextSize(1);
-      StickCP2.Lcd.setTextColor(RED);
-      StickCP2.Lcd.setCursor(10, 10);
-      StickCP2.Lcd.println("Erro na requisicao USD.");
-      StickCP2.Lcd.printf("Codigo: %d", httpCodeUSD);
-    }
+// Função para buscar dados do ticker (24h) usando o endpoint da Binance
+// lastPrice e change24h serão retornados por referência
+bool fetchTicker(const String &url, float &lastPrice, float &change24h) {
+  HTTPClient http;
+  http.begin(url);
+  http.setTimeout(10000);
+  int httpCode = http.GET();
+  if(httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, payload);
+    // Os campos "lastPrice" e "priceChangePercent" são strings
+    lastPrice = atof(doc["lastPrice"]);
+    change24h = atof(doc["priceChangePercent"]);
+    http.end();
+    return true;
   } else {
-    StickCP2.Lcd.fillScreen(BLACK);
+    http.end();
+    return false;
+  }
+}
+
+// Função para buscar o preço de abertura (open price) da vela de 1h
+bool fetchKline(const String &url, float &openPrice) {
+  HTTPClient http;
+  http.begin(url);
+  http.setTimeout(10000);
+  int httpCode = http.GET();
+  if(httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, payload);
+    // O retorno é um array; pegamos o primeiro candle (array) e o open price está no índice 1
+    if(doc.is<JsonArray>()){
+      JsonArray arr = doc.as<JsonArray>();
+      if(arr.size() > 0){
+        JsonArray firstCandle = arr[0].as<JsonArray>();
+        openPrice = atof(firstCandle[1]);
+      }
+    }
+    http.end();
+    return true;
+  } else {
+    http.end();
+    return false;
+  }
+}
+
+// Função para buscar os dados da Binance e atualizar o display
+void fetchAndDisplayBTC() {
+  float usdPrice = 0.0, change24hUSD = 0.0, openPriceUSD = 0.0, change1hUSD = 0.0;
+  float brlPrice = 0.0, change24hBRL = 0.0, openPriceBRL = 0.0, change1hBRL = 0.0;
+  
+  bool tickerUSDFetched = fetchTicker(tickerUSDUrl, usdPrice, change24hUSD);
+  bool klineUSDFetched = fetchKline(klineUSDUrl, openPriceUSD);
+  if(klineUSDFetched && openPriceUSD > 0) {
+    change1hUSD = ((usdPrice - openPriceUSD) / openPriceUSD) * 100.0;
+  }
+  
+  bool tickerBRLFetched = fetchTicker(tickerBRLUrl, brlPrice, change24hBRL);
+  bool klineBRLFetched = fetchKline(klineBRLUrl, openPriceBRL);
+  if(klineBRLFetched && openPriceBRL > 0) {
+    change1hBRL = ((brlPrice - openPriceBRL) / openPriceBRL) * 100.0;
+  }
+  
+  // Atualiza o último preço USD para uso no registro de compra
+  lastPriceUSD = usdPrice;
+  
+  // Define as cores com base nas variações para o par USD
+  uint16_t color1hUSD = (change1hUSD >= 0 ? GREEN : RED);
+  uint16_t color24hUSD = (change24hUSD >= 0 ? GREEN : RED);
+  // O preço é colorido conforme a variação de 24h
+  uint16_t priceColorUSD = (change24hUSD >= 0 ? GREEN : RED);
+  
+  // Define as cores para o par BRL
+  uint16_t color1hBRL = (change1hBRL >= 0 ? GREEN : RED);
+  uint16_t color24hBRL = (change24hBRL >= 0 ? GREEN : RED);
+  uint16_t priceColorBRL = (change24hBRL >= 0 ? GREEN : RED);
+  
+  // Se houve compra registrada, calcula a variação em relação ao preço de compra
+  bool showPurchase = (purchasePrice > 0);
+  float purchaseVariation = 0.0;
+  uint16_t purchaseColor = WHITE;
+  if(showPurchase) {
+    purchaseVariation = ((usdPrice - purchasePrice) / purchasePrice) * 100.0;
+    purchaseColor = (purchaseVariation >= 0 ? GREEN : RED);
+  }
+  
+  // Atualiza o display
+  StickCP2.Lcd.fillScreen(BLACK);
+  
+  // Título
+  StickCP2.Lcd.setTextSize(1);
+  StickCP2.Lcd.setTextColor(WHITE);
+  StickCP2.Lcd.setCursor(10, 0);
+  StickCP2.Lcd.println("BTC (Binance)");
+  
+  // Exibe preço em USD com cor indicativa
+  StickCP2.Lcd.setTextSize(2);
+  StickCP2.Lcd.setTextColor(priceColorUSD);
+  StickCP2.Lcd.setCursor(10, 10);
+  StickCP2.Lcd.printf("USD: $%.2f", usdPrice);
+  
+  // Exibe preço em BRL com cor indicativa
+  StickCP2.Lcd.setTextSize(2);
+  StickCP2.Lcd.setTextColor(priceColorBRL);
+  StickCP2.Lcd.setCursor(10, 35);
+  StickCP2.Lcd.printf("BRL: R$%.2f", brlPrice);
+  
+  // Variação 1h e 24h para par USD
+  StickCP2.Lcd.setTextSize(1);
+  StickCP2.Lcd.setCursor(10, 60);
+  StickCP2.Lcd.setTextColor(color1hUSD);
+  StickCP2.Lcd.printf("1h: %.2f%%", change1hUSD);
+  StickCP2.Lcd.setCursor(10, 75);
+  StickCP2.Lcd.setTextColor(color24hUSD);
+  StickCP2.Lcd.printf("24h: %.2f%%", change24hUSD);
+  
+  // Opcional: Variação para par BRL
+  StickCP2.Lcd.setCursor(10, 90);
+  StickCP2.Lcd.setTextColor(color1hBRL);
+  StickCP2.Lcd.printf("1h(BRL): %.2f%%", change1hBRL);
+  StickCP2.Lcd.setCursor(10, 105);
+  StickCP2.Lcd.setTextColor(color24hBRL);
+  StickCP2.Lcd.printf("24h(BRL): %.2f%%", change24hBRL);
+  
+  // Se houver registro de compra, exibe os dados
+  if(showPurchase) {
     StickCP2.Lcd.setTextSize(1);
-    StickCP2.Lcd.setTextColor(RED);
-    StickCP2.Lcd.setCursor(10, 10);
-    StickCP2.Lcd.println("Sem WiFi.");
+    StickCP2.Lcd.setTextColor(WHITE);
+    StickCP2.Lcd.setCursor(10, 120);
+    StickCP2.Lcd.printf("Comprado: $%.2f", purchasePrice);
+    StickCP2.Lcd.setCursor(10, 135);
+    StickCP2.Lcd.setTextColor(purchaseColor);
+    StickCP2.Lcd.printf("Var: %.2f%%", purchaseVariation);
   }
 }
 
@@ -153,18 +182,18 @@ void setup() {
 
 void loop() {
   StickCP2.update(); // Atualiza o estado dos botões
-
-  // Se o botão A for pressionado, registra o preço de compra (em USD) e mostra mensagem de confirmação
+  
+  // Se o botão A for pressionado, registra o preço atual (USD) como preço de compra
   if (StickCP2.BtnA.wasPressed()) {
-    purchasePrice = lastUsdPrice;
+    purchasePrice = lastPriceUSD;
     Serial.printf("Botão A pressionado. Preço registrado: $%.2f\n", purchasePrice);
-    // Exibe mensagem de confirmação (por 3 segundos)
-    StickCP2.Lcd.fillRect(0, 120, 160, 16, BLACK);
+    // Exibe mensagem de confirmação por 3 segundos
+    StickCP2.Lcd.fillRect(0, 145, 160, 16, BLACK);
     StickCP2.Lcd.setTextSize(1);
     StickCP2.Lcd.setTextColor(WHITE);
-    StickCP2.Lcd.setCursor(10, 120);
+    StickCP2.Lcd.setCursor(10, 145);
     StickCP2.Lcd.printf("Comprado: $%.2f", purchasePrice);
-    delay(3000); // Pausa breve para exibir a mensagem
+    delay(3000);
   }
   
   // Atualiza o display a cada 30 segundos (não bloqueante)
