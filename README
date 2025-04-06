@@ -32,7 +32,7 @@ Clone o repositório:
 bash
 Copiar
 Editar
-git clone https://github.com/seu-usuario/btc-monitor-m5stickplus.git
+git clone https://github.com/danielfmoraes/btc-monitor-m5stickplus.git
 Configure as credenciais do Wi-Fi:
 
 Edite o arquivo include/secrets.h com seu SSID e senha.
