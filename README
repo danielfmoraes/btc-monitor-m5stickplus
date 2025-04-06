@@ -1,40 +1,64 @@
-# BTC Monitor com M5StickPlus (PlatformIO)
 
-Projeto para exibir o valor do Bitcoin em Dólar e Real no M5StickPlus com destaque de variação de 24h:
+## M5STICKPLUS2 PARA COMPRA TRADE DE BITCOIN
 
-- 🔴 Queda superior a 5% = vermelho
-- 🔵 Alta superior a 5% = azul
-- ⚪️ Estável = branco
+## 🔐 Configuração de Credenciais
 
-## 🛠️ Requisitos
+As credenciais do Wi-Fi ficam armazenadas no arquivo `include/secrets.h`. **Nunca suba esse arquivo com os dados reais para o GitHub!**
 
-- VS Code com extensão PlatformIO
-- Placa: M5StickC Plus
-- Conexão Wi-Fi
-
-## 🚀 Como usar
-
-1. Clone este repositório
-2. Insira seu SSID e senha do Wi-Fi no `main.cpp`
-3. Compile e envie para seu M5StickPlus
-4. Acompanhe o display!
-5. O preço será atualizado a cada 30 segundos
-
-
-## 📡 Fonte de dados
-
-[CoinGecko API](https://www.coingecko.com/)
-
-## 🔐 Segurança
-
-As credenciais de Wi-Fi ficam em `include/secrets.h` e **não devem ser incluídas no repositório público**.
-
-Exemplo de `secrets.h`:
+Exemplo do conteúdo de `secrets.h`:
 
 ```cpp
 #define WIFI_SSID "SEU_SSID"
 #define WIFI_PASSWORD "SUA_SENHA"
 
-## 📄 Licença
+⚙️ Plataforma e Dependências
+Plataforma: M5StickCPlus2
 
-[MIT](LICENSE)
+Ambiente: PlatformIO no VS Code
+
+Bibliotecas utilizadas:
+
+M5StickCPlus2 (M5Unified)
+
+WiFi
+
+HTTPClient
+
+ArduinoJson
+
+🚀 Configuração do Projeto
+Clone o repositório:
+
+bash
+Copiar
+Editar
+git clone https://github.com/seu-usuario/btc-monitor-m5stickplus.git
+Configure as credenciais do Wi-Fi:
+
+Edite o arquivo include/secrets.h com seu SSID e senha.
+
+Abra o projeto no VS Code e use o PlatformIO para compilar e enviar o firmware para o dispositivo.
+
+📡 Funcionamento
+Atualização dos Dados:
+A cada 30 segundos, o dispositivo busca os dados do preço do Bitcoin utilizando a API do CoinGecko (do endpoint /coins/markets), exibindo:
+
+Preço atual em USD e BRL.
+
+Variação percentual de 1 hora e 24 horas.
+
+Registro de Compra:
+Ao pressionar o botão A:
+
+O preço atual (USD) é registrado como preço de compra.
+
+Uma mensagem de confirmação "Comprado: $<valor>" é exibida.
+
+A partir daí, o display mostra a variação percentual do preço atual em relação ao preço de compra, com a cor indicando:
+
+Verde: Alta.
+
+Vermelho: Queda.
+
+Reset:
+O registro da compra é mantido até o dispositivo ser reiniciado.
