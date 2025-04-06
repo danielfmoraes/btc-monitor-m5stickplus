@@ -22,6 +22,10 @@ float lastPriceUSD = 0.0;       // Guarda o último preço USD obtido
 unsigned long previousMillis = 0;
 const long interval = 30000;    // Atualiza a cada 30 segundos
 
+// Variáveis para mensagem de confirmação não bloqueante
+unsigned long purchaseMsgTime = 0;
+bool showPurchaseMsg = false;
+
 void connectWiFi() {
   WiFi.begin(ssid, password);
   StickCP2.Lcd.println("Conectando WiFi...");
@@ -131,7 +135,7 @@ void fetchAndDisplayBTC() {
   StickCP2.Lcd.setCursor(10, 35);
   StickCP2.Lcd.printf("BRL: R$%.2f", brlPrice);
   
-  // Variações: exibindo 1h e 24h lado a lado
+  // Variações: exibe 1h e 24h lado a lado
   StickCP2.Lcd.setTextSize(1);
   
   // Linha de 1h
@@ -150,7 +154,7 @@ void fetchAndDisplayBTC() {
   StickCP2.Lcd.setTextColor(color24hBRL);
   StickCP2.Lcd.printf("24h BRL: %.2f%%", change24hBRL);
   
-  // Exibe dados de compra se registrado
+  // Exibe dados de compra se registrados
   if(showPurchase) {
     StickCP2.Lcd.setTextSize(1);
     StickCP2.Lcd.setTextColor(WHITE);
@@ -178,13 +182,20 @@ void loop() {
   if (StickCP2.BtnA.wasPressed()) {
     purchasePrice = lastPriceUSD;
     Serial.printf("Botão A pressionado. Preço registrado: $%.2f\n", purchasePrice);
-    // Exibe mensagem de confirmação por 3 segundos
+    purchaseMsgTime = millis();
+    showPurchaseMsg = true;
+  }
+  
+  // Exibe mensagem de confirmação não bloqueante por 2 segundos
+  if (showPurchaseMsg) {
     StickCP2.Lcd.fillRect(0, 145, 160, 16, BLACK);
     StickCP2.Lcd.setTextSize(1);
     StickCP2.Lcd.setTextColor(WHITE);
     StickCP2.Lcd.setCursor(10, 145);
     StickCP2.Lcd.printf("Comprado: $%.2f", purchasePrice);
-    delay(3000);
+    if (millis() - purchaseMsgTime >= 2000) {
+      showPurchaseMsg = false;
+    }
   }
   
   // Atualiza o display a cada 30 segundos (não bloqueante)
