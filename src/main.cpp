@@ -123,5 +123,5 @@ void setup() {
 
 void loop() {
   fetchAndDisplayBTC();
-  delay(10000); // Atualiza a cada 10 segundos
+  delay(30000); // Atualiza a cada 30 segundos
 }
