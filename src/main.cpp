@@ -3,203 +3,215 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "secrets.h"
+#include <float.h>
 
-const char* ssid = WIFI_SSID;
-const char* password = WIFI_PASSWORD;
 
-// Endpoints para Binance - USD
-const String tickerUSDUrl = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT";
-const String klineUSDUrl  = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=1";
+#define ALERT_BUZZER_PIN 2
+#define BTN_A_BUTTON M5.BtnA
+#define BTN_B_BUTTON M5.BtnB
 
-// Endpoints para Binance - BRL (verifique se esse par está disponível)
-const String tickerBRLUrl = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCBRL";
-const String klineBRLUrl  = "https://api.binance.com/api/v3/klines?symbol=BTCBRL&interval=1h&limit=1";
+float lastPriceUSD = 0;
+unsigned long lastUpdateTime = 0;
+const unsigned long updateInterval = 30000;
 
-// Variáveis globais para registrar a compra
-float purchasePrice = -1.0;   // Se for -1, nenhuma compra foi registrada
-float lastPriceUSD = 0.0;       // Guarda o último preço USD obtido
+float lastPurchaseUSD = 0;
 
-unsigned long previousMillis = 0;
-const long interval = 30000;    // Atualiza a cada 30 segundos
+void connectToWiFi() {
+  M5.Lcd.setCursor(10, 20);
+  M5.Lcd.print("Conectando ao WiFi...");
 
-// Variáveis para mensagem de confirmação não bloqueante
-unsigned long purchaseMsgTime = 0;
-bool showPurchaseMsg = false;
-
-void connectWiFi() {
-  WiFi.begin(ssid, password);
-  StickCP2.Lcd.println("Conectando WiFi...");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    StickCP2.Lcd.print(".");
-  }
-  StickCP2.Lcd.println("\nWiFi conectado!");
-}
-
-bool fetchTicker(const String &url, float &lastPrice, float &change24h) {
-  HTTPClient http;
-  http.begin(url);
-  http.setTimeout(10000);
-  int httpCode = http.GET();
-  if(httpCode == 200) {
-    String payload = http.getString();
-    DynamicJsonDocument doc(1024);
-    deserializeJson(doc, payload);
-    lastPrice = atof(doc["lastPrice"]);
-    change24h = atof(doc["priceChangePercent"]);
-    http.end();
-    return true;
-  } else {
-    http.end();
-    return false;
-  }
-}
-
-bool fetchKline(const String &url, float &openPrice) {
-  HTTPClient http;
-  http.begin(url);
-  http.setTimeout(10000);
-  int httpCode = http.GET();
-  if(httpCode == 200) {
-    String payload = http.getString();
-    DynamicJsonDocument doc(1024);
-    deserializeJson(doc, payload);
-    if(doc.is<JsonArray>()){
-      JsonArray arr = doc.as<JsonArray>();
-      if(arr.size() > 0){
-        JsonArray firstCandle = arr[0].as<JsonArray>();
-        openPrice = atof(firstCandle[1]);
-      }
+  for (int i = 0; i < wifiNetworkCount; ++i) {
+    WiFi.begin(wifiNetworks[i].ssid, wifiNetworks[i].password);
+    if (WiFi.waitForConnectResult() == WL_CONNECTED) {
+      M5.Lcd.setCursor(10, 40);
+      M5.Lcd.printf("Conectado a %s", wifiNetworks[i].ssid);
+      return;
     }
-    http.end();
-    return true;
+  }
+
+  M5.Lcd.setCursor(10, 60);
+  M5.Lcd.println("Falha no WiFi.");
+}
+
+bool fetchTicker(const String &symbol, float &priceUSD, float &priceBRL) {
+  HTTPClient http;
+  http.begin("https://api.binance.com/api/v3/ticker/price?symbol=" + symbol + "USDT");
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    JsonDocument doc;
+    deserializeJson(doc, http.getString());
+    priceUSD = doc["price"].as<float>();
   } else {
     http.end();
     return false;
   }
+  http.end();
+
+  http.begin("https://api.binance.com/api/v3/ticker/price?symbol=" + symbol + "BRL");
+  httpCode = http.GET();
+  if (httpCode == 200) {
+    JsonDocument doc;
+    deserializeJson(doc, http.getString());
+    priceBRL = doc["price"].as<float>();
+  } else {
+    http.end();
+    return false;
+  }
+  http.end();
+
+  return true;
 }
 
-void fetchAndDisplayBTC() {
-  float usdPrice = 0.0, change24hUSD = 0.0, openPriceUSD = 0.0, change1hUSD = 0.0;
-  float brlPrice = 0.0, change24hBRL = 0.0, openPriceBRL = 0.0, change1hBRL = 0.0;
-  
-  bool tickerUSDFetched = fetchTicker(tickerUSDUrl, usdPrice, change24hUSD);
-  bool klineUSDFetched = fetchKline(klineUSDUrl, openPriceUSD);
-  if(klineUSDFetched && openPriceUSD > 0) {
-    change1hUSD = ((usdPrice - openPriceUSD) / openPriceUSD) * 100.0;
-  }
-  
-  bool tickerBRLFetched = fetchTicker(tickerBRLUrl, brlPrice, change24hBRL);
-  bool klineBRLFetched = fetchKline(klineBRLUrl, openPriceBRL);
-  if(klineBRLFetched && openPriceBRL > 0) {
-    change1hBRL = ((brlPrice - openPriceBRL) / openPriceBRL) * 100.0;
-  }
-  
-  lastPriceUSD = usdPrice; // Atualiza o último preço USD
+bool fetchKline(const String &symbol, float &variation1h, float &variation24h) {
+  HTTPClient http;
+  http.begin("https://api.binance.com/api/v3/klines?symbol=" + symbol + "USDT&interval=1h&limit=25");
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    JsonDocument doc;
+    deserializeJson(doc, http.getString());
 
-  // Define cores com base nas variações
-  uint16_t color1hUSD = (change1hUSD >= 0 ? GREEN : RED);
-  uint16_t color24hUSD = (change24hUSD >= 0 ? GREEN : RED);
-  uint16_t priceColorUSD = (change24hUSD >= 0 ? GREEN : RED);
-  
-  uint16_t color1hBRL = (change1hBRL >= 0 ? GREEN : RED);
-  uint16_t color24hBRL = (change24hBRL >= 0 ? GREEN : RED);
-  uint16_t priceColorBRL = (change24hBRL >= 0 ? GREEN : RED);
-  
-  // Se houve compra registrada, calcula a variação
-  bool showPurchase = (purchasePrice > 0);
-  float purchaseVariation = 0.0;
-  uint16_t purchaseColor = WHITE;
-  if(showPurchase) {
-    purchaseVariation = ((usdPrice - purchasePrice) / purchasePrice) * 100.0;
-    purchaseColor = (purchaseVariation >= 0 ? GREEN : RED);
+    float price1hAgo = atof(doc[23][4]);
+    float priceNow = atof(doc[24][4]);
+    variation1h = ((priceNow - price1hAgo) / price1hAgo) * 100.0;
+
+    float price24hAgo = atof(doc[0][4]);
+    variation24h = ((priceNow - price24hAgo) / price24hAgo) * 100.0;
+    return true;
   }
-  
-  // Atualiza o display
-  StickCP2.Lcd.fillScreen(BLACK);
-  
-  // Título
-  StickCP2.Lcd.setTextSize(1);
-  StickCP2.Lcd.setTextColor(WHITE);
-  StickCP2.Lcd.setCursor(10, 0);
-  StickCP2.Lcd.println("BTC (Binance)");
-  
-  // Preços
-  StickCP2.Lcd.setTextSize(2);
-  StickCP2.Lcd.setTextColor(priceColorUSD);
-  StickCP2.Lcd.setCursor(10, 10);
-  StickCP2.Lcd.printf("USD: $%.2f", usdPrice);
-  
-  StickCP2.Lcd.setTextSize(2);
-  StickCP2.Lcd.setTextColor(priceColorBRL);
-  StickCP2.Lcd.setCursor(10, 35);
-  StickCP2.Lcd.printf("BRL: R$%.2f", brlPrice);
-  
-  // Variações: exibe 1h e 24h lado a lado
-  StickCP2.Lcd.setTextSize(1);
-  // Linha de 1h
-  StickCP2.Lcd.setCursor(10, 60);
-  StickCP2.Lcd.setTextColor(color1hUSD);
-  StickCP2.Lcd.printf("1h USD: %.2f%%", change1hUSD);
-  StickCP2.Lcd.setCursor(80, 60);
-  StickCP2.Lcd.setTextColor(color1hBRL);
-  StickCP2.Lcd.printf("1h BRL: %.2f%%", change1hBRL);
-  // Linha de 24h
-  StickCP2.Lcd.setCursor(10, 75);
-  StickCP2.Lcd.setTextColor(color24hUSD);
-  StickCP2.Lcd.printf("24h USD: %.2f%%", change24hUSD);
-  StickCP2.Lcd.setCursor(80, 75);
-  StickCP2.Lcd.setTextColor(color24hBRL);
-  StickCP2.Lcd.printf("24h BRL: %.2f%%", change24hBRL);
-  
-  // Exibe dados de compra se registrados
-  if(showPurchase) {
-    StickCP2.Lcd.setTextSize(1);
-    StickCP2.Lcd.setTextColor(WHITE);
-    StickCP2.Lcd.setCursor(10, 90);
-    StickCP2.Lcd.printf("Comprado: $%.2f", purchasePrice);
-    StickCP2.Lcd.setCursor(10, 105);
-    StickCP2.Lcd.setTextColor(purchaseColor);
-    StickCP2.Lcd.printf("Var: %.2f%%", purchaseVariation);
+  http.end();
+  return false;
+}
+
+void drawBatteryIcon() {
+  int level = M5.Power.getBatteryLevel();
+  M5.Lcd.setCursor(190, 5);
+  M5.Lcd.setTextColor(WHITE);
+  M5.Lcd.setTextSize(1);
+  M5.Lcd.printf("%d%%", level);
+}
+
+void drawBTCGraph() {
+  HTTPClient http;
+  http.begin("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=24");
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    JsonDocument doc;
+    deserializeJson(doc, http.getString());
+
+    std::vector<float> prices;
+    float minPrice = FLT_MAX;
+    float maxPrice = 0;
+
+    for (JsonArray candle : doc.as<JsonArray>()) {
+      float closePrice = atof(candle[4]);
+      prices.push_back(closePrice);
+      if (closePrice < minPrice) minPrice = closePrice;
+      if (closePrice > maxPrice) maxPrice = closePrice;
+    }
+
+    M5.Lcd.fillScreen(BLACK);
+    M5.Lcd.setTextColor(WHITE);
+    M5.Lcd.setCursor(5, 0);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.print("Grafico BTC/USD - 24h");
+
+    M5.Lcd.setCursor(0, 20);
+    M5.Lcd.printf("$%.0f", maxPrice);
+    M5.Lcd.setCursor(0, 95);
+    M5.Lcd.printf("$%.0f", minPrice);
+
+    int xOffset = 30;
+    int graphHeight = 80;
+    int graphWidth = 100;
+    int xStep = graphWidth / prices.size();
+    int yStart = 20 + graphHeight;
+
+    for (size_t i = 1; i < prices.size(); ++i) {
+      int x0 = xOffset + (i - 1) * xStep;
+      int y0 = yStart - ((prices[i - 1] - minPrice) / (maxPrice - minPrice)) * graphHeight;
+      int x1 = xOffset + i * xStep;
+      int y1 = yStart - ((prices[i] - minPrice) / (maxPrice - minPrice)) * graphHeight;
+      M5.Lcd.drawLine(x0, y0, x1, y1, YELLOW);
+    }
+  }
+  http.end();
+}
+
+void showPrices() {
+  float priceUSD = 0, priceBRL = 0, variation1h = 0, variation24h = 0;
+  if (!fetchTicker("BTC", priceUSD, priceBRL)) return;
+  if (!fetchKline("BTC", variation1h, variation24h)) return;
+
+  M5.Lcd.fillScreen(BLACK);
+  drawBatteryIcon();
+
+  // Definir cor com base na variação 24h
+  if (variation24h > 5) {
+    M5.Lcd.setTextColor(GREEN, BLACK);
+    tone(ALERT_BUZZER_PIN, 1000, 200);
+  } else if (variation24h < -5) {
+    M5.Lcd.setTextColor(RED, BLACK);
+    tone(ALERT_BUZZER_PIN, 500, 200);
+  } else {
+    M5.Lcd.setTextColor(WHITE, BLACK);
+  }
+
+  M5.Lcd.setTextSize(2);
+  M5.Lcd.setCursor(0, 5);
+  M5.Lcd.printf("USD: %.2f", priceUSD);
+  M5.Lcd.setCursor(0, 30);
+  M5.Lcd.printf("BRL: %.2f", priceBRL);
+
+  M5.Lcd.setTextSize(1);
+  M5.Lcd.setCursor(0, 55);
+  M5.Lcd.printf("1h: %.2f%%", variation1h);
+  M5.Lcd.setCursor(0, 70);
+  M5.Lcd.printf("24h: %.2f%%", variation24h);
+
+  // Mostra a última compra (se houver)
+  if (lastPurchaseUSD > 0) {
+    M5.Lcd.setTextColor(GREEN, BLACK);
+    M5.Lcd.setCursor(0, 90);
+    M5.Lcd.printf("Compra: $%.2f", lastPurchaseUSD);
   }
 }
 
 void setup() {
-  Serial.begin(115200);
-  StickCP2.begin();
-  StickCP2.Lcd.setRotation(1);
-  StickCP2.Lcd.fillScreen(BLACK);
-  StickCP2.Lcd.setTextSize(1);
-  connectWiFi();
+  M5.begin();
+  M5.Lcd.setRotation(3);
+  M5.Lcd.setTextSize(1);
+  pinMode(ALERT_BUZZER_PIN, OUTPUT);
+  connectToWiFi();
+  showPrices();
 }
 
 void loop() {
-  StickCP2.update();
-  
-  // Se o botão A for pressionado, registra o preço atual (USD) como compra e inicia a mensagem de confirmação
-  if (StickCP2.BtnA.wasPressed()) {
-    purchasePrice = lastPriceUSD;
-    Serial.printf("Botão A pressionado. Preço registrado: $%.2f\n", purchasePrice);
-    purchaseMsgTime = millis();
-    showPurchaseMsg = true;
-  }
-  
-  // Exibe a mensagem de confirmação por 2 segundos e impede atualização do display nesse período
-  if (showPurchaseMsg) {
-    StickCP2.Lcd.fillRect(0, 145, 160, 16, BLACK);
-    StickCP2.Lcd.setTextSize(1);
-    StickCP2.Lcd.setTextColor(WHITE);
-    StickCP2.Lcd.setCursor(10, 145);
-    StickCP2.Lcd.printf("Comprado: $%.2f", purchasePrice);
-    if (millis() - purchaseMsgTime >= 2000) {
-      showPurchaseMsg = false;
+  M5.update();
+
+  if (BTN_A_BUTTON.wasPressed()) {
+    float priceUSD = 0, priceBRL = 0;
+    if (fetchTicker("BTC", priceUSD, priceBRL)) {
+      lastPurchaseUSD = priceUSD;
+
+      M5.Lcd.fillScreen(BLACK);
+      drawBatteryIcon();
+      M5.Lcd.setTextColor(GREEN, BLACK);
+      M5.Lcd.setCursor(0, 30);
+      M5.Lcd.setTextSize(2);
+      M5.Lcd.printf("Compra!\n$%.2f", lastPurchaseUSD);
+      delay(1500);
     }
+    showPrices();
   }
-  
-  // Atualiza o display a cada 30 segundos, desde que não esteja exibindo a mensagem de compra
-  unsigned long currentMillis = millis();
-  if (!showPurchaseMsg && (currentMillis - previousMillis >= interval)) {
-    previousMillis = currentMillis;
-    fetchAndDisplayBTC();
+
+  if (BTN_B_BUTTON.wasPressed()) {
+    drawBTCGraph();
+    delay(5000);
+    showPrices();
+  }
+
+  if (millis() - lastUpdateTime >= updateInterval) {
+    showPrices();
+    lastUpdateTime = millis();
   }
 }
