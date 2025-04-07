@@ -1,80 +1,72 @@
+# M5StickC Plus - Monitor de Preço do Bitcoin
 
-## M5STICKPLUS2 PARA COMPRA TRADE DE BITCOIN
+Este projeto exibe o preço do Bitcoin (BTC) em dólares (USD) e reais (BRL) no dispositivo **M5StickC Plus**, com alertas visuais e sonoros para variações de preço.
 
-## 🔐 Configuração de Credenciais
+## Funcionalidades
 
-As credenciais do Wi-Fi ficam armazenadas no arquivo `include/secrets.h`. **Nunca suba esse arquivo com os dados reais para o GitHub!**
+- Exibição do preço atual do BTC em USD e BRL.
+- Variações percentuais de 1h e 24h com destaque visual:
+  - Azul: aumento > 5%
+  - Vermelho: queda > 5%
+  - Cores intermediárias a partir de 0.5%
+- Exibição do valor de compra, com destaque e persistência até reinício.
+- Alertas com buzzer e piscadas para variações bruscas (> 5%).
+- Suporte a múltiplas redes Wi-Fi via `secrets.h`.
+- Botão A:
+  - Mostra/oculta o gráfico de variação de preço.
+- Botão B:
+  - Exibe o gráfico por 5 segundos.
+- Layout vertical com:
+  - Preço do BTC destacado
+  - Valor de compra abaixo
+  - Variações e preços bem distribuídos
+  - Nível da bateria no topo
 
-Exemplo do conteúdo de `secrets.h`:
+## Estrutura
 
+```
+📁 bitcoin-monitor/
+├── data/
+│   └── histórico.csv        # histórico opcional de preços
+├── src/
+│   └── main.cpp             # código principal para o M5StickC Plus
+├── include/
+│   └── secrets.h            # credenciais Wi-Fi
+├── .gitignore
+├── LICENSE
+├── README.md
+└── platformio.ini
+```
+
+## Requisitos
+
+- [PlatformIO](https://platformio.org/install)
+- Biblioteca M5StickC Plus
+- Conta em uma exchange com API de preços (usamos a CoinGecko)
+
+## Como usar
+
+1. Clone o repositório:
+```bash
+git clone https://github.com/danielfmoraes/btc-monitor-m5stickplus
+cd bitcoin-monitor
+```
+
+2. Configure as redes Wi-Fi em `include/secrets.h`:
 ```cpp
-// secrets.h
-#ifndef SECRETS_H
-#define SECRETS_H
+const char* ssids[] = {"WiFi1", "WiFi2"};
+const char* passwords[] = {"senha1", "senha2"};
+```
 
-struct WiFiCredential {
-  const char* ssid;
-  const char* password;
-};
+3. Compile e envie para o M5StickC Plus via PlatformIO:
+```bash
+pio run --target upload
+```
 
-const WiFiCredential wifiNetworks[] = {
-  { "SUA_REDE_1", "SENHA_1" },
-  { "SUA_REDE_2", "SENHA_2" }
-};
+## Licença
 
-const int wifiNetworkCount = sizeof(wifiNetworks) / sizeof(wifiNetworks[0]);
+Este projeto está licenciado sob a [MIT License](LICENSE).
 
-#endif
+---
 
-
-⚙️ Plataforma e Dependências
-Plataforma: M5StickCPlus2
-
-Ambiente: PlatformIO no VS Code
-
-Bibliotecas utilizadas:
-
-M5StickCPlus2 (M5Unified)
-
-WiFi
-
-HTTPClient
-
-ArduinoJson
-
-🚀 Configuração do Projeto
-Clone o repositório:
-
-bash
-Copiar
-Editar
-git clone https://github.com/danielfmoraes/btc-monitor-m5stickplus.git
-Configure as credenciais do Wi-Fi:
-
-Edite o arquivo include/secrets.h com seu SSID e senha.
-
-Abra o projeto no VS Code e use o PlatformIO para compilar e enviar o firmware para o dispositivo.
-
-📡 Funcionamento
-Atualização dos Dados:
-A cada 30 segundos, o dispositivo busca os dados do preço do Bitcoin utilizando a API do CoinGecko (do endpoint /coins/markets), exibindo:
-
-Preço atual em USD e BRL.
-
-Variação percentual de 1 hora e 24 horas.
-
-Registro de Compra:
-Ao pressionar o botão A:
-
-O preço atual (USD) é registrado como preço de compra.
-
-Uma mensagem de confirmação "Comprado: $<valor>" é exibida.
-
-A partir daí, o display mostra a variação percentual do preço atual em relação ao preço de compra, com a cor indicando:
-
-Verde: Alta.
-
-Vermelho: Queda.
-
-Reset:
-O registro da compra é mantido até o dispositivo ser reiniciado.
+Sinta-se à vontade para contribuir com melhorias, gráficos personalizados ou outras criptos!
