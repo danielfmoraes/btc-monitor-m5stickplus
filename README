@@ -54,9 +54,24 @@ cd bitcoin-monitor
 
 2. Configure as redes Wi-Fi em `include/secrets.h`:
 ```cpp
-const char* ssids[] = {"WiFi1", "WiFi2"};
-const char* passwords[] = {"senha1", "senha2"};
-```
+// secrets.h
+#ifndef SECRETS_H
+#define SECRETS_H
+
+struct WiFiCredential {
+  const char* ssid;
+  const char* password;
+};
+
+const WiFiCredential wifiNetworks[] = {
+  { "SUA_REDE_1", "SENHA_1" },
+  { "SUA_REDE_2", "SENHA_2" }
+};
+
+const int wifiNetworkCount = sizeof(wifiNetworks) / sizeof(wifiNetworks[0]);
+
+#endif
+
 
 3. Compile e envie para o M5StickC Plus via PlatformIO:
 ```bash
